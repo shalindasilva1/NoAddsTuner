@@ -20,7 +20,7 @@ class ToneGenerator {
 
     private var audioTrack: AudioTrack? = null
     private var playJob: Job? = null
-    private var isPlaying = false
+    @Volatile private var isPlaying = false
 
     fun startTone(frequency: Float, scope: CoroutineScope) {
         stopTone() // Reset active playback

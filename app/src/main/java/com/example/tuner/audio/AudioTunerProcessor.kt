@@ -36,7 +36,7 @@ class AudioTunerProcessor(private val context: Context) {
 
     private var audioRecord: AudioRecord? = null
     private var recordingJob: Job? = null
-    private var isRecording = false
+    @Volatile private var isRecording = false
 
     @SuppressLint("MissingPermission")
     fun start(scope: CoroutineScope) {
