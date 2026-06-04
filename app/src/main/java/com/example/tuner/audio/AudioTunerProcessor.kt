@@ -27,7 +27,7 @@ class AudioTunerProcessor(private val context: Context) {
         private const val TAG = "AudioTunerProcessor"
         private const val SAMPLE_RATE = 44100
         private const val BUFFER_SIZE = 4096
-        private const val NOISE_GATE_THRESHOLD = 0.008f // Amplitude threshold below which we ignore signal
+        private const val NOISE_GATE_THRESHOLD = 0.003f // Amplitude threshold below which we ignore signal
     }
 
     private val pitchDetector = YinPitchDetector()
@@ -78,12 +78,16 @@ class AudioTunerProcessor(private val context: Context) {
                     val readResult = audioRecord?.read(audioBuffer, 0, BUFFER_SIZE) ?: -1
                     if (readResult <= 0) continue
 
-                    // 1. Convert PCM to Floats scaled between -1.0 and 1.0, and calculate RMS amplitude
+                    // 1. Convert PCM to Floats scaled between -1.0 and 1.0, apply a low-pass filter (cutoff ~1.2 kHz) to attenuate high harmonics/noise, and calculate RMS amplitude
                     var sumSquared = 0f
+                    var prevSample = 0f
+                    val alpha = 0.15f
                     for (i in 0 until readResult) {
                         val sample = audioBuffer[i] / 32768f
-                        floatBuffer[i] = sample
-                        sumSquared += sample * sample
+                        val filteredSample = prevSample + alpha * (sample - prevSample)
+                        prevSample = filteredSample
+                        floatBuffer[i] = filteredSample
+                        sumSquared += filteredSample * filteredSample
                     }
                     val rms = sqrt(sumSquared / readResult)
 

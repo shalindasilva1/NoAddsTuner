@@ -5,7 +5,7 @@ import kotlin.math.abs
 class YinPitchDetector {
 
     companion object {
-        private const val DEFAULT_THRESHOLD = 0.15f
+        private const val DEFAULT_THRESHOLD = 0.20f
     }
 
     /**
