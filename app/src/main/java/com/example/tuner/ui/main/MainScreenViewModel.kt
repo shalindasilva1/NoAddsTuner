@@ -32,6 +32,7 @@ data class TunerUiState(
     val isRecording: Boolean = false,
     val activeToneIndex: Int? = null, // Index of preset notes currently playing
     val capoFret: Int = 0,            // Pitch offset for tuner tab (0 to 12 semitones)
+    val selectedStringIndex: Int? = null, // null = Auto, 0 to 5 = locked string index
     
     // Tab Navigation State
     val selectedTab: Int = 0,         // 0 = Tuner, 1 = Capo Finder
@@ -87,14 +88,18 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
                             state.selectedPreset
                         }
 
-                        val closest = findClosestNote(smoothedFrequency, activePreset)
-                        val cents = calculateCentsDeviation(smoothedFrequency, closest.frequency)
+                        val target = if (state.selectedStringIndex != null && state.selectedStringIndex < activePreset.notes.size) {
+                            activePreset.notes[state.selectedStringIndex]
+                        } else {
+                            findClosestNote(smoothedFrequency, activePreset)
+                        }
+                        val cents = calculateCentsDeviation(smoothedFrequency, target.frequency)
                         
                         state.copy(
                             currentFrequency = smoothedFrequency,
                             amplitude = result.amplitude,
                             isSilent = false,
-                            targetNote = closest,
+                            targetNote = target,
                             centsDeviation = cents.coerceIn(-50f, 50f)
                         )
                     }
@@ -134,7 +139,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 
     fun selectPreset(preset: TuningPreset) {
         stopTonePlayback()
-        _uiState.update { it.copy(selectedPreset = preset) }
+        _uiState.update { it.copy(selectedPreset = preset, selectedStringIndex = null) }
     }
 
     fun setCapoFret(fret: Int) {
@@ -142,10 +147,17 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
         _uiState.update { it.copy(capoFret = fret) }
     }
 
+    fun selectString(index: Int?) {
+        stopTonePlayback()
+        _uiState.update { it.copy(selectedStringIndex = index) }
+        startTuning()
+    }
+
     fun toggleReferenceTone(noteIndex: Int) {
         val currentState = _uiState.value
         if (currentState.activeToneIndex == noteIndex) {
             stopTonePlayback()
+            startTuning()
         } else {
             stopTuning() // Stop listening to mic
             

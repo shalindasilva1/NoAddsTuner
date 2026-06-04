@@ -283,11 +283,18 @@ fun TunerDashboard(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            val descriptionText = when {
+                state.activeToneIndex != null -> "Playing reference tone... Tap again to stop"
+                state.selectedStringIndex != null -> "Locked to ${state.targetNote?.displayName ?: ""}. Tap AUTO to release."
+                else -> "Auto string picking. Tap a peg to lock target."
+            }
+
             Text(
-                text = if (state.activeToneIndex != null) "Listening to reference tone" else "Tap string to play reference tone",
+                text = descriptionText,
                 color = TextSecondary,
                 fontSize = 13.sp,
-                modifier = Modifier.padding(bottom = 12.dp)
+                modifier = Modifier.padding(bottom = 12.dp),
+                fontWeight = FontWeight.Medium
             )
 
             val activeNotes = if (state.capoFret > 0) {
@@ -300,18 +307,62 @@ fun TunerDashboard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                // 1. AUTO Selection Peg
+                val isAutoSelected = state.selectedStringIndex == null
+                val autoScale by animateFloatAsState(
+                    targetValue = if (isAutoSelected) 1.15f else 1.0f,
+                    animationSpec = spring(stiffness = Spring.StiffnessLow),
+                    label = "AutoPegScale"
+                )
+                Box(
+                    modifier = Modifier
+                        .scale(autoScale)
+                        .size(44.dp)
+                        .shadow(
+                            elevation = if (isAutoSelected) 6.dp else 1.dp,
+                            shape = CircleShape
+                        )
+                        .background(
+                            color = if (isAutoSelected) ColorInTune else CardBackground,
+                            shape = CircleShape
+                        )
+                        .border(
+                            width = 2.dp,
+                            color = if (isAutoSelected) ColorInTune else SurfaceVariant,
+                            shape = CircleShape
+                        )
+                        .clip(CircleShape)
+                        .clickable { viewModel.selectString(null) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "AUTO",
+                        color = if (isAutoSelected) DarkBackground else TextPrimary,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
+
+                // 2. Transposed String Pegs
                 activeNotes.forEachIndexed { index, note ->
+                    val isSelected = state.selectedStringIndex == index
                     val isActive = state.activeToneIndex == index
-                    val isDetected = !state.isSilent && state.targetNote?.displayName == note.displayName
+                    val isDetected = state.selectedStringIndex == null && !state.isSilent && state.targetNote?.displayName == note.displayName
 
                     GuitarStringPeg(
                         note = note,
+                        isSelected = isSelected,
                         isActive = isActive,
                         isDetected = isDetected,
                         onClick = {
-                            onStringClick(index)
+                            if (isSelected) {
+                                viewModel.toggleReferenceTone(index)
+                            } else {
+                                viewModel.selectString(index)
+                            }
                         }
                     )
                 }
@@ -621,34 +672,29 @@ fun NoteDisplay(
 @Composable
 fun GuitarStringPeg(
     note: TuningNote,
+    isSelected: Boolean,
     isActive: Boolean,
     isDetected: Boolean,
     onClick: () -> Unit
 ) {
     val scale by animateFloatAsState(
-        targetValue = if (isActive || isDetected) 1.15f else 1.0f,
+        targetValue = if (isSelected || isActive || isDetected) 1.15f else 1.0f,
         animationSpec = spring(stiffness = Spring.StiffnessLow),
         label = "StringPegScale"
     )
 
-    val borderBrush = if (isActive) {
-        Brush.sweepGradient(listOf(ColorInTune, ColorSharp, ColorInTune))
-    } else {
-        null
-    }
-
     Box(
         modifier = Modifier
             .scale(scale)
-            .size(54.dp)
+            .size(44.dp)
             .shadow(
-                elevation = if (isActive) 8.dp else 2.dp,
+                elevation = if (isSelected || isActive) 6.dp else 1.dp,
                 shape = CircleShape
             )
             .background(
                 color = when {
                     isActive -> ColorInTune.copy(alpha = 0.25f)
-                    isDetected -> ColorInTune
+                    isSelected || isDetected -> ColorInTune
                     else -> CardBackground
                 },
                 shape = CircleShape
@@ -657,7 +703,7 @@ fun GuitarStringPeg(
                 width = 2.dp,
                 color = when {
                     isActive -> ColorInTune
-                    isDetected -> ColorInTune
+                    isSelected || isDetected -> ColorInTune
                     else -> SurfaceVariant
                 },
                 shape = CircleShape
@@ -675,20 +721,20 @@ fun GuitarStringPeg(
                 text = note.name,
                 color = when {
                     isActive -> ColorInTune
-                    isDetected -> DarkBackground
+                    isSelected || isDetected -> DarkBackground
                     else -> TextPrimary
                 },
-                fontSize = 15.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 text = note.octave.toString(),
                 color = when {
                     isActive -> ColorInTune.copy(alpha = 0.7f)
-                    isDetected -> DarkBackground.copy(alpha = 0.7f)
+                    isSelected || isDetected -> DarkBackground.copy(alpha = 0.7f)
                     else -> TextSecondary
                 },
-                fontSize = 10.sp,
+                fontSize = 9.sp,
                 fontWeight = FontWeight.Medium
             )
         }
